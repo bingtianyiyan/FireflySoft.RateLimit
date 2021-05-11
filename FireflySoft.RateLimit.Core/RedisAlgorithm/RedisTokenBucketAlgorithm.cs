@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
+using Microsoft.AspNetCore.Http;
 using StackExchange.Redis;
 
 namespace FireflySoft.RateLimit.Core.RedisAlgorithm
@@ -98,7 +99,7 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule)
+        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null)
         {
             var currentRule = rule as TokenBucketRule;
             var amount = 1;
@@ -124,7 +125,7 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule)
+        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
         {
             var currentRule = rule as TokenBucketRule;
             var amount = 1;
@@ -138,9 +139,9 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
             var result = new Tuple<bool, long>(ret[0] == 0 ? false : true, ret[1]);
             return new RuleCheckResult()
             {
-                IsLimit = ret[0] == 0 ? false : true,
+                IsLimit = result.Item1,
                 Target = target,
-                Count = ret[1],
+                Count = result.Item2,
                 Rule = rule
             };
         }

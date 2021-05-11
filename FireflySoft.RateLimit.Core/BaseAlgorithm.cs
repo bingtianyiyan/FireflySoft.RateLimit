@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
+using Microsoft.AspNetCore.Http;
 using Nito.AsyncEx;
 
 namespace FireflySoft.RateLimit.Core
@@ -57,7 +58,7 @@ namespace FireflySoft.RateLimit.Core
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected abstract RuleCheckResult CheckSingleRule(string target, RateLimitRule rule);
+        protected abstract RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null);
 
         /// <summary>
         /// Check single rule for target
@@ -65,7 +66,7 @@ namespace FireflySoft.RateLimit.Core
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected abstract Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule);
+        protected abstract Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null);
 
         /// <summary>
         /// Update the current rules
@@ -223,7 +224,8 @@ namespace FireflySoft.RateLimit.Core
                     }
 
                     target = string.Concat(rule.Id, "-", target);
-                    yield return await CheckSingleRuleAsync(target, rule);
+                    HttpContext context = request is HttpContext ? (HttpContext)request : null;
+                    yield return await CheckSingleRuleAsync(target, rule,context);
                 }
             }
         }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
+using Microsoft.AspNetCore.Http;
 using StackExchange.Redis;
 
 namespace FireflySoft.RateLimit.Core.RedisAlgorithm
@@ -114,7 +115,7 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule)
+        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null)
         {
             var currentRule = rule as SlidingWindowRule;
             var amount = 1;
@@ -142,7 +143,7 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule)
+        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
         {
             var currentRule = rule as SlidingWindowRule;
             var amount = 1;

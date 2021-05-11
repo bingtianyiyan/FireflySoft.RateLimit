@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
+using Microsoft.AspNetCore.Http;
 
 namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
 {
@@ -28,7 +29,7 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule)
+        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null)
         {
             var currentRule = rule as LeakyBucketRule;
             var amount = 1;
@@ -50,9 +51,9 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule)
+        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
         {
-            return await Task.FromResult(CheckSingleRule(target, rule));
+            return await Task.FromResult(CheckSingleRule(target, rule,context));
         }
 
         /// <summary>

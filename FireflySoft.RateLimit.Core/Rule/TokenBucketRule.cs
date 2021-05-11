@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace FireflySoft.RateLimit.Core.Rule
 {
@@ -11,17 +10,23 @@ namespace FireflySoft.RateLimit.Core.Rule
         /// <summary>
         /// Rhe capacity of token bucket
         /// </summary>
-        public int Capacity { get; private set; }
+        public int Capacity { get; set; }
 
         /// <summary>
         /// The inflow quantity per unit time
         /// </summary>
-        public int InflowQuantityPerUnit { get; private set; }
+        public int InflowQuantityPerUnit { get; set; }
 
         /// <summary>
         /// The time unit of inflow to the bucket bucket
         /// </summary>
-        public TimeSpan InflowUnit { get; private set; }
+        public TimeSpan InflowUnit { get; set; }
+
+        /// <summary>
+        /// true: throw exception, false:not throw exception
+        /// Exception->RateLimitException
+        /// </summary>
+        public bool RateLimitExceptionThrow { get; set; }
 
         /// <summary>
         /// create a new instance

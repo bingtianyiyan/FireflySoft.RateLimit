@@ -1,8 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+using FireflySoft.RateLimit.Core.Attribute;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
 {
@@ -11,6 +15,11 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
     /// </summary>
     public class InProcessTokenBucketAlgorithm : BaseInProcessAlgorithm
     {
+        /// <summary>
+        /// store rateLimitRule
+        /// </summary>
+        private static readonly ConcurrentDictionary<string, TokenBucketRule> _requestRateLimitRule = new ConcurrentDictionary<string, TokenBucketRule>();
+
         /// <summary>
         /// create a new instance
         /// </summary>
@@ -28,12 +37,41 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule)
+        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null)
         {
             var currentRule = rule as TokenBucketRule;
             var amount = 1;
-
+            //check controller of method mark TokenbucketAttribute is priority compare with global
+            if (context != null)
+            {
+                bool exists = _requestRateLimitRule.TryGetValue(target, out TokenBucketRule storeRule);
+                if (exists)
+                {
+                    currentRule = storeRule;
+                }
+                else
+                {
+                    //check Attribute
+                    var endpoint = GetEndpoint(context);
+                    if (endpoint != null)
+                    {
+                        var actionAttribute = endpoint.Metadata.GetMetadata<TokenBucketLimitAttribute>();
+                        if (actionAttribute != null)
+                        {
+                            currentRule.Capacity = actionAttribute.Capacity;
+                            currentRule.InflowQuantityPerUnit = actionAttribute.InflowQuantityPerUnit;
+                            currentRule.InflowUnit = CommonUtils.Parse(actionAttribute.Period);
+                            currentRule.RateLimitExceptionThrow = actionAttribute.RateLimitExceptionThrow;
+                            _requestRateLimitRule.TryAdd(target, currentRule);
+                        }
+                    }
+                }
+            }
             var result = InnerCheckSingleRule(target, amount, currentRule);
+            if (result.Item1 && currentRule.RateLimitExceptionThrow)
+            {
+                throw new RateLimitException(context.Request.Path.Value);
+            }
             return new RuleCheckResult()
             {
                 IsLimit = result.Item1,
@@ -44,14 +82,29 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         }
 
         /// <summary>
+        /// get endpoint
+        /// </summary>
+        /// <param name="context"></param>
+        /// <returns></returns>
+        public static Endpoint GetEndpoint(HttpContext context)
+        {
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            return context.Features.Get<IEndpointFeature>()?.Endpoint;
+        }
+
+        /// <summary>
         /// check single rule for target
         /// </summary>
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule)
+        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
         {
-            return await Task.FromResult(CheckSingleRule(target, rule));
+            return await Task.FromResult(CheckSingleRule(target, rule, context));
         }
 
         /// <summary>

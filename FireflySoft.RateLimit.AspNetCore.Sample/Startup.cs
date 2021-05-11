@@ -43,9 +43,9 @@ namespace FireflySoft.RateLimit.AspNetCore.Sample
                 app.UseDeveloperExceptionPage();
             }
 
-            app.UseRateLimit();
-
             app.UseRouting();
+
+            app.UseRateLimit();
 
             app.UseAuthorization();
 
@@ -53,6 +53,7 @@ namespace FireflySoft.RateLimit.AspNetCore.Sample
             {
                 endpoints.MapControllers();
             });
+
         }
 
         private void AddLimitForPerSecond(IServiceCollection app)
