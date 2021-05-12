@@ -36,12 +36,13 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// </summary>
         /// <param name="target"></param>
         /// <param name="rule"></param>
+        /// <param name="context">request</param>
         /// <returns></returns>
         protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null)
         {
             var currentRule = rule as TokenBucketRule;
             var amount = 1;
-            //check controller of method mark TokenbucketAttribute is priority compare with global
+            #region check controller of method mark TokenbucketAttribute is priority compare with global service.AddRamitLimit
             if (context != null)
             {
                 bool exists = _requestRateLimitRule.TryGetValue(target, out TokenBucketRule storeRule);
@@ -66,7 +67,8 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
                         }
                     }
                 }
-            }
+            } 
+            #endregion
             var result = InnerCheckSingleRule(target, amount, currentRule);
             if (result.Item1 && currentRule.RateLimitExceptionThrow)
             {
@@ -101,6 +103,7 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// </summary>
         /// <param name="target"></param>
         /// <param name="rule"></param>
+        /// <param name="context">request</param>
         /// <returns></returns>
         protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
         {

@@ -1,12 +1,12 @@
+using FireflySoft.RateLimit.Core.Rule;
+using FireflySoft.RateLimit.Core.Time;
+using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using FireflySoft.RateLimit.Core.Rule;
-using FireflySoft.RateLimit.Core.Time;
-using StackExchange.Redis;
 
 namespace FireflySoft.RateLimit.Core.RedisAlgorithm
 {
@@ -29,7 +29,7 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
             _redisClient = redisClient;
             if (_redisClient == null)
             {
-                _redisClient = StackExchange.Redis.ConnectionMultiplexer.Connect("127.0.0.1");
+                _redisClient = ConnectionMultiplexer.Connect("127.0.0.1");
             }
         }
 
@@ -102,7 +102,7 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
             public string Script { get; private set; }
 
             /// <summary>
-            /// The script SHA1 
+            /// The script SHA1
             /// </summary>
             /// <value></value>
             public byte[] SHA1 { get; private set; }
@@ -111,7 +111,7 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
             /// Async load script in the redis server
             /// </summary>
             /// <returns></returns>
-            public async System.Threading.Tasks.Task<byte[]> LoadAsync()
+            public async Task<byte[]> LoadAsync()
             {
                 if (SHA1 == null)
                 {
