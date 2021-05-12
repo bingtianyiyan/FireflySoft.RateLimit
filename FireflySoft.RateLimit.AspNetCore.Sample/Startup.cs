@@ -94,7 +94,12 @@ namespace FireflySoft.RateLimit.AspNetCore.Sample
                         },
                         Name="default limit rule",
                     }
-                })
+                }),error:new HttpErrorResponse() { HttpStatusCode=201,
+                    BuildHttpContent = (context, ruleCheckResult) =>
+                    {
+                        return "{\"data\":null,\"resultCode\":0,\"resultMsg\":\"Î´Öª´íÎó\"}";
+                    }
+                }
             );
         }
 

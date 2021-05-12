@@ -4,11 +4,8 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
 
-
   <ItemGroup>
-    <ProjectReference Include="..\FireflySoft.RateLimit.AspNetCore\FireflySoft.RateLimit.AspNetCore.csproj">
-      <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
-    </ProjectReference>
+    <ProjectReference Include="..\FireflySoft.RateLimit.Core\FireflySoft.RateLimit.Core.csproj" />
   </ItemGroup>
 
 </Project>

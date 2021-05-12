@@ -57,6 +57,7 @@ namespace FireflySoft.RateLimit.Core
         /// </summary>
         /// <param name="target"></param>
         /// <param name="rule"></param>
+        /// <param name="context">request</param>
         /// <returns></returns>
         protected abstract RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null);
 
@@ -65,6 +66,7 @@ namespace FireflySoft.RateLimit.Core
         /// </summary>
         /// <param name="target"></param>
         /// <param name="rule"></param>
+        /// <param name="context">request</param>
         /// <returns></returns>
         protected abstract Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null);
 
