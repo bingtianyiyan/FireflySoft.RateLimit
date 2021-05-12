@@ -45,7 +45,7 @@ namespace FireflySoft.RateLimit.AspNetCore.Sample
 
             app.UseRouting();
 
-            app.UseRateLimit();
+            app.UseRateLimit(true);
 
             app.UseAuthorization();
 

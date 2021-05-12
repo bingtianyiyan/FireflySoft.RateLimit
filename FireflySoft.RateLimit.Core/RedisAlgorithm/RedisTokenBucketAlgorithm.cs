@@ -123,7 +123,7 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
                 else
                 {
                     //check Attribute
-                    var endpoint = GetEndpoint(context);
+                    var endpoint = CommonUtils.GetEndpoint(context);
                     if (endpoint != null)
                     {
                         var actionAttribute = endpoint.Metadata.GetMetadata<TokenBucketLimitAttribute>();
@@ -180,7 +180,7 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
                 else
                 {
                     //check Attribute
-                    var endpoint = GetEndpoint(context);
+                    var endpoint = CommonUtils.GetEndpoint(context);
                     if (endpoint != null)
                     {
                         var actionAttribute = endpoint.Metadata.GetMetadata<TokenBucketLimitAttribute>();
@@ -213,21 +213,6 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
                 Count = result.Item2,
                 Rule = rule
             };
-        }
-
-        /// <summary>
-        /// get endpoint
-        /// </summary>
-        /// <param name="context"></param>
-        /// <returns></returns>
-        public static Endpoint GetEndpoint(HttpContext context)
-        {
-            if (context == null)
-            {
-                throw new ArgumentNullException(nameof(context));
-            }
-
-            return context.Features.Get<IEndpointFeature>()?.Endpoint;
         }
     }
 }

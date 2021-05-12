@@ -15,6 +15,8 @@
 *└──────────────────────────────────┘
 */
 
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using System;
 using System.Linq;
 
@@ -53,6 +55,21 @@ namespace FireflySoft.RateLimit.Core
         private static FormatException GetException(string notation)
         {
             return new FormatException("Could not parse notation " + notation);
+        }
+
+        /// <summary>
+        /// get endpoint
+        /// </summary>
+        /// <param name="context"></param>
+        /// <returns></returns>
+        public static Endpoint GetEndpoint(HttpContext context)
+        {
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            return context.Features.Get<IEndpointFeature>()?.Endpoint;
         }
     }
 }

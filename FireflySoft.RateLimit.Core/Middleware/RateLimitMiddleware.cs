@@ -1,6 +1,10 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using FireflySoft.RateLimit.Core.Attribute;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
+using Polly;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -17,6 +21,8 @@ namespace FireflySoft.RateLimit.Core
         private readonly IAlgorithm _algorithm;
         private readonly HttpErrorResponse _error;
         private readonly HttpInvokeInterceptor _interceptor;
+        private readonly bool _polly;
+        private static ConcurrentDictionary<string, AsyncPolicy> _getPollyObj = new ConcurrentDictionary<string, AsyncPolicy>();
 
         /// <summary>
         /// Create a new instance
@@ -25,12 +31,13 @@ namespace FireflySoft.RateLimit.Core
         /// <param name="algorithm"></param>
         /// <param name="error"></param>
         /// <param name="interceptor"></param>
-        public RateLimitMiddleware(RequestDelegate next, IAlgorithm algorithm, HttpErrorResponse error, HttpInvokeInterceptor interceptor)
+        public RateLimitMiddleware(RequestDelegate next, IAlgorithm algorithm, HttpErrorResponse error, HttpInvokeInterceptor interceptor, bool polly = false)
         {
             _next = next;
             _algorithm = algorithm;
             _error = error;
             _interceptor = interceptor;
+            _polly = polly;
         }
 
         /// <summary>
@@ -40,8 +47,43 @@ namespace FireflySoft.RateLimit.Core
         /// <returns></returns>
         public async Task Invoke(HttpContext context)
         {
+            //wheather need RateLimit
+            var endpoint = CommonUtils.GetEndpoint(context);
+            if (endpoint != null)
+            {
+                var enableRateLimitAttribute = endpoint.Metadata.GetMetadata<EnableRateLimitAttribute>();
+                if(enableRateLimitAttribute == null)
+                {
+                    await _next(context);
+                    return;
+                }
+                var disableRateLimitAttribute = endpoint.Metadata.GetMetadata<DisableRateLimitAttribute>();
+                if (disableRateLimitAttribute != null)
+                {
+                    await _next(context);
+                    return;
+                }
+            }
+            else
+            {
+                await _next(context);
+                return;
+            }
+            context.Items.Add("PollyRequire", _polly);
             await DoOnBeforeCheck(context, _algorithm).ConfigureAwait(false);
-            var checkResult = await _algorithm.CheckAsync(context);
+            AlgorithmCheckResult checkResult = await _algorithm.CheckAsync(context);
+            //if (_polly)
+            //{
+            //    checkResult = await PollyRateLimitAdvancedCircuitBreakerAsync(context.Request.Path.Value,0.75, TimeSpan.FromSeconds(10), 100, TimeSpan.FromSeconds(10))
+            //        .ExecuteAsync<AlgorithmCheckResult>(async () =>
+            //    {
+            //        return await _algorithm.CheckAsync(context);
+            //    });
+            //}
+            //else
+            //{
+            //    checkResult = await _algorithm.CheckAsync(context);
+            //}
             await DoOnAfterCheck(context, checkResult).ConfigureAwait(false);
 
             if (checkResult.IsLimit)
@@ -198,6 +240,29 @@ namespace FireflySoft.RateLimit.Core
                 }
             }
         }
+
+        /// <summary>
+        /// rateLimit exception
+        /// </summary>
+        /// <returns></returns>
+        private static AsyncPolicy PollyRateLimitAdvancedCircuitBreakerAsync(string policyKey,double failureThreshold,TimeSpan samplingDuration,int minimumThroughput,TimeSpan durationOfBreak)
+        {
+            var getResult = _getPollyObj.TryGetValue(policyKey, out AsyncPolicy pollyObj);
+            if (getResult)
+            {
+                return pollyObj;
+            }
+            var breakPolicy = Policy.Handle<RateLimitException>().AdvancedCircuitBreakerAsync(
+                failureThreshold: failureThreshold,
+                samplingDuration: samplingDuration,
+                minimumThroughput: minimumThroughput,
+                durationOfBreak: durationOfBreak
+                );
+            var retry = Policy.Handle<RateLimitException>().WaitAndRetryAsync(1, i => TimeSpan.FromMilliseconds(100 * i));
+            var fallbackBreak = Policy.WrapAsync(retry, breakPolicy).WithPolicyKey(policyKey);
+            _getPollyObj.TryAdd(policyKey, fallbackBreak);
+            return fallbackBreak;
+        }
     }
 
     /// <summary>
@@ -209,10 +274,11 @@ namespace FireflySoft.RateLimit.Core
         /// Using rate limit processor
         /// </summary>
         /// <param name="builder"></param>
+        /// <param name="polly"></param>
         /// <returns></returns>
-        public static IApplicationBuilder UseRateLimit(this IApplicationBuilder builder)
+        public static IApplicationBuilder UseRateLimit(this IApplicationBuilder builder, bool polly = true)
         {
-            return builder.UseMiddleware<RateLimitMiddleware>();
+            return builder.UseMiddleware<RateLimitMiddleware>(polly);
         }
     }
 }

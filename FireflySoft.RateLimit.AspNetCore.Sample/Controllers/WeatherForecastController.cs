@@ -25,7 +25,9 @@ namespace FireflySoft.RateLimit.AspNetCore.Sample.Controllers
         }
 
         [HttpGet]
-        [TokenBucketLimit(Capacity =1,InflowQuantityPerUnit = 10,Period = "1h",RateLimitExceptionThrow =true)]
+        [EnableRateLimitAttribute]
+      //  [DisableRateLimitAttribute]
+        [TokenBucketLimit(Capacity = 2,InflowQuantityPerUnit = 100,Period = "2s",RateLimitExceptionThrow =false)]
         public IEnumerable<WeatherForecast> Get()
         {
             var rng = new Random();
