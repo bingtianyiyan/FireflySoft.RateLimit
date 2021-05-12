@@ -1,19 +1,13 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using FireflySoft.RateLimit.Core;
 using FireflySoft.RateLimit.Core.InProcessAlgorithm;
 using FireflySoft.RateLimit.Core.Rule;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using System;
 
 namespace FireflySoft.RateLimit.AspNetCore.Sample
 {
@@ -45,7 +39,7 @@ namespace FireflySoft.RateLimit.AspNetCore.Sample
 
             app.UseRouting();
 
-            app.UseRateLimit(true);
+            app.UseRateLimit();
 
             app.UseAuthorization();
 
@@ -53,7 +47,6 @@ namespace FireflySoft.RateLimit.AspNetCore.Sample
             {
                 endpoints.MapControllers();
             });
-
         }
 
         private void AddLimitForPerSecond(IServiceCollection app)
@@ -94,12 +87,15 @@ namespace FireflySoft.RateLimit.AspNetCore.Sample
                         },
                         Name="default limit rule",
                     }
-                }),error:new HttpErrorResponse() { HttpStatusCode=201,
+                }), error: new HttpErrorResponse()
+                {
+                    HttpStatusCode = 201,
                     BuildHttpContent = (context, ruleCheckResult) =>
                     {
                         return "{\"data\":null,\"resultCode\":0,\"resultMsg\":\"Î´Öª´íÎó\"}";
                     }
                 }
+                , specialRule: new RateLimitSpecialRule() { EnablePolly = true, MethodList = new string[] { "WeatherForecast/Get2"} }
             );
         }
 

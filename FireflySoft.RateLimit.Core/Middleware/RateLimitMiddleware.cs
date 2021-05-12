@@ -1,6 +1,7 @@
 ﻿using FireflySoft.RateLimit.Core.Attribute;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Primitives;
 using Polly;
 using System;
@@ -21,7 +22,8 @@ namespace FireflySoft.RateLimit.Core
         private readonly IAlgorithm _algorithm;
         private readonly HttpErrorResponse _error;
         private readonly HttpInvokeInterceptor _interceptor;
-        private readonly bool _polly;
+        private readonly RateLimitSpecialRule _specialRule;
+        private static ConcurrentDictionary<string, string> _getMethodRoutePath = new ConcurrentDictionary<string, string>();
         private static ConcurrentDictionary<string, AsyncPolicy> _getPollyObj = new ConcurrentDictionary<string, AsyncPolicy>();
 
         /// <summary>
@@ -31,13 +33,14 @@ namespace FireflySoft.RateLimit.Core
         /// <param name="algorithm"></param>
         /// <param name="error"></param>
         /// <param name="interceptor"></param>
-        public RateLimitMiddleware(RequestDelegate next, IAlgorithm algorithm, HttpErrorResponse error, HttpInvokeInterceptor interceptor, bool polly = false)
+        /// <param name="specialRule"></param>
+        public RateLimitMiddleware(RequestDelegate next, IAlgorithm algorithm, HttpErrorResponse error, HttpInvokeInterceptor interceptor, RateLimitSpecialRule specialRule)
         {
             _next = next;
             _algorithm = algorithm;
             _error = error;
             _interceptor = interceptor;
-            _polly = polly;
+            _specialRule = specialRule;
         }
 
         /// <summary>
@@ -47,29 +50,54 @@ namespace FireflySoft.RateLimit.Core
         /// <returns></returns>
         public async Task Invoke(HttpContext context)
         {
-            //wheather need RateLimit
-            var endpoint = CommonUtils.GetEndpoint(context);
-            if (endpoint != null)
+            #region check whether need RateLimit  and  global rule methodList is prority then other rules
+
+            string methodPath = context.Request.Path.Value;
+            bool getMethodNameResult = _getMethodRoutePath.TryGetValue(methodPath, out string methodCacheName);
+            if (!getMethodNameResult)
             {
-                var enableRateLimitAttribute = endpoint.Metadata.GetMetadata<EnableRateLimitAttribute>();
-                if(enableRateLimitAttribute == null)
+                var routeData = context.GetRouteData();
+                if (routeData != null
+                    && routeData.Values.Any())
                 {
-                    await _next(context);
-                    return;
+                    var controllerName = routeData.Values["controller"];
+                    var actionName = routeData.Values["action"];
+                    methodCacheName = controllerName != null && actionName != null ? controllerName + "/" + actionName : methodPath;
+                    _getMethodRoutePath.TryAdd(methodPath, methodCacheName);
                 }
-                var disableRateLimitAttribute = endpoint.Metadata.GetMetadata<DisableRateLimitAttribute>();
-                if (disableRateLimitAttribute != null)
+            }
+            if (!(_specialRule != null
+                && _specialRule.MethodList != null
+                && _specialRule.MethodList.Any()
+                && _specialRule.MethodList.Contains(methodCacheName)))
+            {
+                //wheather need RateLimit
+                var endpoint = CommonUtils.GetEndpoint(context);
+                if (endpoint != null)
+                {
+                    var enableRateLimitAttribute = endpoint.Metadata.GetMetadata<EnableRateLimitAttribute>();
+                    if (enableRateLimitAttribute == null)
+                    {
+                        await _next(context);
+                        return;
+                    }
+                    var disableRateLimitAttribute = endpoint.Metadata.GetMetadata<DisableRateLimitAttribute>();
+                    if (disableRateLimitAttribute != null)
+                    {
+                        await _next(context);
+                        return;
+                    }
+                }
+                else
                 {
                     await _next(context);
                     return;
                 }
             }
-            else
-            {
-                await _next(context);
-                return;
-            }
-            context.Items.Add("PollyRequire", _polly);
+
+            #endregion check whether need RateLimit  and  global rule methodList is prority then other rules
+
+            //context.Items.Add("PollyRequire", _specialRule != null ? _specialRule.EnablePolly :false);
             await DoOnBeforeCheck(context, _algorithm).ConfigureAwait(false);
             AlgorithmCheckResult checkResult = await _algorithm.CheckAsync(context);
             //if (_polly)
@@ -245,7 +273,7 @@ namespace FireflySoft.RateLimit.Core
         /// rateLimit exception
         /// </summary>
         /// <returns></returns>
-        private static AsyncPolicy PollyRateLimitAdvancedCircuitBreakerAsync(string policyKey,double failureThreshold,TimeSpan samplingDuration,int minimumThroughput,TimeSpan durationOfBreak)
+        private static AsyncPolicy PollyRateLimitAdvancedCircuitBreakerAsync(string policyKey, double failureThreshold, TimeSpan samplingDuration, int minimumThroughput, TimeSpan durationOfBreak)
         {
             var getResult = _getPollyObj.TryGetValue(policyKey, out AsyncPolicy pollyObj);
             if (getResult)
@@ -274,11 +302,10 @@ namespace FireflySoft.RateLimit.Core
         /// Using rate limit processor
         /// </summary>
         /// <param name="builder"></param>
-        /// <param name="polly"></param>
         /// <returns></returns>
-        public static IApplicationBuilder UseRateLimit(this IApplicationBuilder builder, bool polly = true)
+        public static IApplicationBuilder UseRateLimit(this IApplicationBuilder builder)
         {
-            return builder.UseMiddleware<RateLimitMiddleware>(polly);
+            return builder.UseMiddleware<RateLimitMiddleware>();
         }
     }
 }

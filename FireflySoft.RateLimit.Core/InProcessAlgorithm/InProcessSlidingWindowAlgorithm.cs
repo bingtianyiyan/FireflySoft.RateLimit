@@ -1,11 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
 using Microsoft.AspNetCore.Http;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
 {
@@ -54,7 +53,7 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// <returns></returns>
         protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
         {
-            return await Task.FromResult(CheckSingleRule(target, rule,context));
+            return await Task.FromResult(CheckSingleRule(target, rule, context));
         }
 
         private Tuple<bool, long> InnerCheckSingleRule(string target, int amount, SlidingWindowRule currentRule)

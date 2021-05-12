@@ -2,7 +2,6 @@ using FireflySoft.RateLimit.Core.Attribute;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Features;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -42,7 +41,9 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         {
             var currentRule = rule as TokenBucketRule;
             var amount = 1;
+
             #region check controller of method mark TokenbucketAttribute is priority compare with global service.AddRamitLimit
+
             if (context != null)
             {
                 bool exists = _requestRateLimitRule.TryGetValue(target, out TokenBucketRule storeRule);
@@ -67,8 +68,10 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
                         }
                     }
                 }
-            } 
-            #endregion
+            }
+
+            #endregion check controller of method mark TokenbucketAttribute is priority compare with global service.AddRamitLimit
+
             var result = InnerCheckSingleRule(target, amount, currentRule);
             if (result.Item1 && currentRule.RateLimitExceptionThrow)
             {
