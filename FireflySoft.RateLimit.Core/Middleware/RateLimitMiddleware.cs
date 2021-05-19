@@ -51,7 +51,7 @@ namespace FireflySoft.RateLimit.Core
         /// <returns></returns>
         public async Task Invoke(HttpContext context)
         {
-            #region check whether need RateLimit  and  global rule methodList is prority then other rules
+            #region check whether need RateLimit  and local Attribute is prority then other rules
 
             string methodPath = context.Request.Path.Value;
             bool getMethodNameResult = _getMethodRoutePath.TryGetValue(methodPath, out string methodCacheName);
@@ -68,10 +68,11 @@ namespace FireflySoft.RateLimit.Core
                 }
             }
             EnableRateLimitAttribute enableRateLimitAttribute = null;
-            if (!(_specialRule != null
-                && _specialRule.MethodList != null
-                && _specialRule.MethodList.Any()
-                && _specialRule.MethodList.Contains(methodCacheName)))
+            bool specialRuleResult = _specialRule != null
+                                    && _specialRule.MethodList != null
+                                    && _specialRule.MethodList.Any()
+                                    && _specialRule.MethodList.Contains(methodCacheName);
+            if (!specialRuleResult)
             {
                 //wheather need RateLimit
                 var endpoint = CommonUtils.GetEndpoint(context);
@@ -97,11 +98,14 @@ namespace FireflySoft.RateLimit.Core
                 }
             }
 
-            #endregion check whether need RateLimit  and  global rule methodList is prority then other rules
+            #endregion check whether need RateLimit  and local Attribute is prority then other rules
 
             // context.Items.Add("PollyRequire", _specialRule != null ? _specialRule.EnablePolly : false);
             await DoOnBeforeCheck(context, _algorithm).ConfigureAwait(false);
             AlgorithmCheckResult checkResult;//= await _algorithm.CheckAsync(context);
+
+            #region Polly
+
             bool enablePolly = enableRateLimitAttribute == null ? (_specialRule != null ? _specialRule.EnablePolly : false) : enableRateLimitAttribute.EnablePolly;
             if (enablePolly)
             {
@@ -115,6 +119,9 @@ namespace FireflySoft.RateLimit.Core
             {
                 checkResult = await _algorithm.CheckAsync(context);
             }
+
+            #endregion Polly
+
             await DoOnAfterCheck(context, checkResult).ConfigureAwait(false);
 
             if (checkResult.IsLimit)
@@ -122,27 +129,8 @@ namespace FireflySoft.RateLimit.Core
                 await DoOnTriggered(context, checkResult).ConfigureAwait(false);
 
                 context.Response.StatusCode = _error.HttpStatusCode;
-
-                var headers = await BuildHttpHeaders(context, checkResult).ConfigureAwait(false);
-                if (headers != null && headers.Count > 0)
-                {
-                    foreach (var h in headers)
-                    {
-                        context.Response.Headers.Append(h.Key, h.Value);
-                    }
-                }
-
-                string content = await BuildHttpContent(context, checkResult).ConfigureAwait(false);
-                if (!string.IsNullOrWhiteSpace(content))
-                {
-                    var bodyContent = Encoding.UTF8.GetBytes(content);
-                    context.Response.ContentType = "application/json;charset=utf-8";
-                    await context.Response.Body.WriteAsync(bodyContent, 0, bodyContent.Length).ConfigureAwait(false);
-                }
-                else
-                {
-                    await context.Response.WriteAsync(string.Empty).ConfigureAwait(false);
-                }
+                await SetHeaders(context, checkResult).ConfigureAwait(false);
+                await ReponseWithTooManyRequests(context, checkResult).ConfigureAwait(false);
             }
             else
             {
@@ -154,6 +142,45 @@ namespace FireflySoft.RateLimit.Core
                 await _next(context);
 
                 await DoOnAfterUntriggeredDoNext(context, checkResult).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// setting response header
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="checkResult"></param>
+        /// <returns></returns>
+        private async Task SetHeaders(HttpContext context, AlgorithmCheckResult checkResult)
+        {
+            var headers = await BuildHttpHeaders(context, checkResult).ConfigureAwait(false);
+            if (headers != null && headers.Count > 0)
+            {
+                foreach (var h in headers)
+                {
+                    context.Response.Headers.Append(h.Key, h.Value);
+                }
+            }
+        }
+
+        /// <summary>
+        /// setting rateLimit response content
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="checkResult"></param>
+        /// <returns></returns>
+        private async Task ReponseWithTooManyRequests(HttpContext context, AlgorithmCheckResult checkResult)
+        {
+            string content = await BuildHttpContent(context, checkResult).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(content))
+            {
+                var bodyContent = Encoding.UTF8.GetBytes(content);
+                context.Response.ContentType = "application/json;charset=utf-8";
+                await context.Response.Body.WriteAsync(bodyContent, 0, bodyContent.Length).ConfigureAwait(false);
+            }
+            else
+            {
+                await context.Response.WriteAsync(string.Empty).ConfigureAwait(false);
             }
         }
 
