@@ -16,6 +16,8 @@
 */
 
 using System;
+using System.Net;
+using System.Net.Http;
 
 namespace FireflySoft.RateLimit.Core
 {
@@ -26,9 +28,12 @@ namespace FireflySoft.RateLimit.Core
     {
         public string Name { get; set; }
 
-        public RateLimitException(string name)
+        public HttpStatusCode HttpStatusCode { get; set; }
+
+        public RateLimitException(string name, HttpStatusCode httpStatusCode = HttpStatusCode.Forbidden)
         {
             this.Name = name;
+            this.HttpStatusCode = httpStatusCode;
         }
     }
 }

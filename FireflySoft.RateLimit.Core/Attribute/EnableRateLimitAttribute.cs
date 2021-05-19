@@ -25,5 +25,29 @@ namespace FireflySoft.RateLimit.Core.Attribute
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false)]
     public class EnableRateLimitAttribute : System.Attribute
     {
+        /// <summary>
+        /// 是否启用Polly
+        /// </summary>
+        public bool EnablePolly { get; set; } = true;
+
+        /// <summary>
+        /// 失败率
+        /// </summary>
+        public double FailureThreshold { get; set; } = 0.75;
+
+        /// <summary>
+        /// 样本统计间隔
+        /// </summary>
+        public TimeSpan SamplingDuration { get; set; } = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// 最小通过量
+        /// </summary>
+        public int MinimumThroughput { get; set; } = 100;
+
+        /// <summary>
+        /// 熔断时间长
+        /// </summary>
+        public TimeSpan DurationOfBreak { get; set; } = TimeSpan.FromSeconds(10);
     }
 }

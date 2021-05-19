@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Primitives;
 using Polly;
+using Polly.CircuitBreaker;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -24,7 +25,7 @@ namespace FireflySoft.RateLimit.Core
         private readonly HttpInvokeInterceptor _interceptor;
         private readonly RateLimitSpecialRule _specialRule;
         private static ConcurrentDictionary<string, string> _getMethodRoutePath = new ConcurrentDictionary<string, string>();
-        private static ConcurrentDictionary<string, AsyncPolicy> _getPollyObj = new ConcurrentDictionary<string, AsyncPolicy>();
+        private static ConcurrentDictionary<string, AsyncPolicy<AlgorithmCheckResult>> _getPollyObj = new ConcurrentDictionary<string, AsyncPolicy<AlgorithmCheckResult>>();
 
         /// <summary>
         /// Create a new instance
@@ -66,6 +67,7 @@ namespace FireflySoft.RateLimit.Core
                     _getMethodRoutePath.TryAdd(methodPath, methodCacheName);
                 }
             }
+            EnableRateLimitAttribute enableRateLimitAttribute = null;
             if (!(_specialRule != null
                 && _specialRule.MethodList != null
                 && _specialRule.MethodList.Any()
@@ -75,7 +77,7 @@ namespace FireflySoft.RateLimit.Core
                 var endpoint = CommonUtils.GetEndpoint(context);
                 if (endpoint != null)
                 {
-                    var enableRateLimitAttribute = endpoint.Metadata.GetMetadata<EnableRateLimitAttribute>();
+                    enableRateLimitAttribute = endpoint.Metadata.GetMetadata<EnableRateLimitAttribute>();
                     if (enableRateLimitAttribute == null)
                     {
                         await _next(context);
@@ -97,21 +99,22 @@ namespace FireflySoft.RateLimit.Core
 
             #endregion check whether need RateLimit  and  global rule methodList is prority then other rules
 
-            //context.Items.Add("PollyRequire", _specialRule != null ? _specialRule.EnablePolly :false);
+            // context.Items.Add("PollyRequire", _specialRule != null ? _specialRule.EnablePolly : false);
             await DoOnBeforeCheck(context, _algorithm).ConfigureAwait(false);
-            AlgorithmCheckResult checkResult = await _algorithm.CheckAsync(context);
-            //if (_polly)
-            //{
-            //    checkResult = await PollyRateLimitAdvancedCircuitBreakerAsync(context.Request.Path.Value,0.75, TimeSpan.FromSeconds(10), 100, TimeSpan.FromSeconds(10))
-            //        .ExecuteAsync<AlgorithmCheckResult>(async () =>
-            //    {
-            //        return await _algorithm.CheckAsync(context);
-            //    });
-            //}
-            //else
-            //{
-            //    checkResult = await _algorithm.CheckAsync(context);
-            //}
+            AlgorithmCheckResult checkResult;//= await _algorithm.CheckAsync(context);
+            bool enablePolly = enableRateLimitAttribute == null ? (_specialRule != null ? _specialRule.EnablePolly : false) : enableRateLimitAttribute.EnablePolly;
+            if (enablePolly)
+            {
+                checkResult = await PollyRateLimitAdvancedCircuitBreakerAsync(context.Request.Path.Value, enableRateLimitAttribute)
+                    .ExecuteAsync(async () =>
+                {
+                    return await _algorithm.CheckAsync(context);
+                });
+            }
+            else
+            {
+                checkResult = await _algorithm.CheckAsync(context);
+            }
             await DoOnAfterCheck(context, checkResult).ConfigureAwait(false);
 
             if (checkResult.IsLimit)
@@ -273,21 +276,41 @@ namespace FireflySoft.RateLimit.Core
         /// rateLimit exception
         /// </summary>
         /// <returns></returns>
-        private static AsyncPolicy PollyRateLimitAdvancedCircuitBreakerAsync(string policyKey, double failureThreshold, TimeSpan samplingDuration, int minimumThroughput, TimeSpan durationOfBreak)
+        private static AsyncPolicy<AlgorithmCheckResult> PollyRateLimitAdvancedCircuitBreakerAsync(string policyKey, EnableRateLimitAttribute enableRateLimitAttribute)
         {
-            var getResult = _getPollyObj.TryGetValue(policyKey, out AsyncPolicy pollyObj);
+            var getResult = _getPollyObj.TryGetValue(policyKey, out AsyncPolicy<AlgorithmCheckResult> pollyObj);
             if (getResult)
             {
                 return pollyObj;
             }
-            var breakPolicy = Policy.Handle<RateLimitException>().AdvancedCircuitBreakerAsync(
+            double failureThreshold = enableRateLimitAttribute == null ? 0.75 : enableRateLimitAttribute.FailureThreshold;
+            TimeSpan samplingDuration = enableRateLimitAttribute == null ? TimeSpan.FromSeconds(10) : enableRateLimitAttribute.SamplingDuration;
+            int minimumThroughput = enableRateLimitAttribute == null ? 100 : enableRateLimitAttribute.MinimumThroughput;
+            TimeSpan durationOfBreak = enableRateLimitAttribute == null ? TimeSpan.FromSeconds(10) : enableRateLimitAttribute.DurationOfBreak;
+            var breakPolicy = Policy<AlgorithmCheckResult>.Handle<RateLimitException>().AdvancedCircuitBreakerAsync(
                 failureThreshold: failureThreshold,
                 samplingDuration: samplingDuration,
                 minimumThroughput: minimumThroughput,
-                durationOfBreak: durationOfBreak
+                durationOfBreak: durationOfBreak,
+                onBreak: (r, t) =>
+                {
+                    Console.WriteLine("onbreak");
+                },
+                onReset: () =>
+                {
+                    Console.WriteLine("onReset");
+                },
+                onHalfOpen: () =>
+                {
+                    Console.WriteLine("onHalfOpen");
+                }
                 );
-            var retry = Policy.Handle<RateLimitException>().WaitAndRetryAsync(1, i => TimeSpan.FromMilliseconds(100 * i));
-            var fallbackBreak = Policy.WrapAsync(retry, breakPolicy).WithPolicyKey(policyKey);
+            var retry = Policy<AlgorithmCheckResult>.Handle<RateLimitException>().WaitAndRetryAsync(1, i => TimeSpan.FromMilliseconds(100 * i));
+            var message = new AlgorithmCheckResult(new List<RuleCheckResult>() { new RuleCheckResult() { IsLimit = true } })
+            {
+            };
+            var fallback = Policy<AlgorithmCheckResult>.Handle<BrokenCircuitException>().FallbackAsync(message);
+            var fallbackBreak = Policy.WrapAsync(fallback, retry, breakPolicy).WithPolicyKey(policyKey);
             _getPollyObj.TryAdd(policyKey, fallbackBreak);
             return fallbackBreak;
         }
