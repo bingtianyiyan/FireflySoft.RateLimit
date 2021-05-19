@@ -283,6 +283,7 @@ namespace FireflySoft.RateLimit.Core
             {
                 return pollyObj;
             }
+            int retryCount = enableRateLimitAttribute == null ? 1 : enableRateLimitAttribute.RetryCount;
             double failureThreshold = enableRateLimitAttribute == null ? 0.75 : enableRateLimitAttribute.FailureThreshold;
             TimeSpan samplingDuration = enableRateLimitAttribute == null ? TimeSpan.FromSeconds(10) : enableRateLimitAttribute.SamplingDuration;
             int minimumThroughput = enableRateLimitAttribute == null ? 100 : enableRateLimitAttribute.MinimumThroughput;
@@ -305,7 +306,7 @@ namespace FireflySoft.RateLimit.Core
                     Console.WriteLine("onHalfOpen");
                 }
                 );
-            var retry = Policy<AlgorithmCheckResult>.Handle<RateLimitException>().WaitAndRetryAsync(1, i => TimeSpan.FromMilliseconds(100 * i));
+            var retry = Policy<AlgorithmCheckResult>.Handle<RateLimitException>().WaitAndRetryAsync(retryCount, i => TimeSpan.FromMilliseconds(100 * i));
             var message = new AlgorithmCheckResult(new List<RuleCheckResult>() { new RuleCheckResult() { IsLimit = true } })
             {
             };

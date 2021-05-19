@@ -31,6 +31,11 @@ namespace FireflySoft.RateLimit.Core.Attribute
         public bool EnablePolly { get; set; } = true;
 
         /// <summary>
+        /// 重试次数
+        /// </summary>
+        public int RetryCount { get; set; } = 1;
+
+        /// <summary>
         /// 失败率
         /// </summary>
         public double FailureThreshold { get; set; } = 0.75;
