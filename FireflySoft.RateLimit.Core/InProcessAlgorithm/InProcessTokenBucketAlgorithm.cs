@@ -1,9 +1,6 @@
-using FireflySoft.RateLimit.Core.Attribute;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
-using Microsoft.AspNetCore.Http;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -14,11 +11,6 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
     /// </summary>
     public class InProcessTokenBucketAlgorithm : BaseInProcessAlgorithm
     {
-        /// <summary>
-        /// store rateLimitRule
-        /// </summary>
-        private static readonly ConcurrentDictionary<string, TokenBucketRule> _requestRateLimitRule = new ConcurrentDictionary<string, TokenBucketRule>();
-
         /// <summary>
         /// create a new instance
         /// </summary>
@@ -35,54 +27,33 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// </summary>
         /// <param name="target"></param>
         /// <param name="rule"></param>
-        /// <param name="context">request</param>
+        /// <param name="rateLimitAttrData"></param>
         /// <returns></returns>
-        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null)
+        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
             var currentRule = rule as TokenBucketRule;
             var amount = 1;
 
             #region check controller of method mark TokenbucketAttribute is priority compare with global service.AddRamitLimit
 
-            if (context != null)
+            if (rateLimitAttrData != null && rateLimitAttrData.TokenBucketLimitAttribute != null)
             {
-                bool exists = _requestRateLimitRule.TryGetValue(target, out TokenBucketRule storeRule);
-                if (exists)
-                {
-                    currentRule = storeRule;
-                }
-                else
-                {
-                    //check Attribute
-                    var endpoint = CommonUtils.GetEndpoint(context);
-                    if (endpoint != null)
-                    {
-                        var actionAttribute = endpoint.Metadata.GetMetadata<TokenBucketLimitAttribute>();
-                        if (actionAttribute != null)
-                        {
-                            currentRule.Capacity = actionAttribute.Capacity;
-                            currentRule.InflowQuantityPerUnit = actionAttribute.InflowQuantityPerUnit;
-                            currentRule.InflowUnit = CommonUtils.Parse(actionAttribute.Period);
-                            currentRule.RateLimitExceptionThrow = actionAttribute.RateLimitExceptionThrow;
-                            _requestRateLimitRule.TryAdd(target, currentRule);
-                        }
-                    }
-                }
+                currentRule.Capacity = rateLimitAttrData.TokenBucketLimitAttribute.Capacity;
+                currentRule.InflowQuantityPerUnit = rateLimitAttrData.TokenBucketLimitAttribute.InflowQuantityPerUnit;
+                currentRule.InflowUnit = CommonUtils.Parse(rateLimitAttrData.TokenBucketLimitAttribute.Period);
+                currentRule.RateLimitExceptionThrow = rateLimitAttrData.TokenBucketLimitAttribute.RateLimitExceptionThrow;
             }
 
             #endregion check controller of method mark TokenbucketAttribute is priority compare with global service.AddRamitLimit
 
             var result = InnerCheckSingleRule(target, amount, currentRule);
-            if (result.Item1 && currentRule.RateLimitExceptionThrow)
-            {
-                throw new RateLimitException(context.Request.Path.Value);
-            }
             return new RuleCheckResult()
             {
                 IsLimit = result.Item1,
                 Target = target,
                 Count = result.Item2,
-                Rule = rule
+                Rule = rule,
+                RateLimitExceptionThrow = currentRule.RateLimitExceptionThrow
             };
         }
 
@@ -91,11 +62,11 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// </summary>
         /// <param name="target"></param>
         /// <param name="rule"></param>
-        /// <param name="context">request</param>
+        /// <param name="rateLimitAttrData"></param>
         /// <returns></returns>
-        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
+        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
-            return await Task.FromResult(CheckSingleRule(target, rule, context));
+            return await Task.FromResult(CheckSingleRule(target, rule, rateLimitAttrData));
         }
 
         /// <summary>

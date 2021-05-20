@@ -1,11 +1,9 @@
+using FireflySoft.RateLimit.Core.Rule;
+using FireflySoft.RateLimit.Core.Time;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using FireflySoft.RateLimit.Core.Attribute;
-using FireflySoft.RateLimit.Core.Rule;
-using FireflySoft.RateLimit.Core.Time;
-using Microsoft.AspNetCore.Http;
 
 namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
 {
@@ -36,45 +34,30 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null)
+        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
             var currentRule = rule as FixedWindowRule;
             var amount = 1;
+
             #region local attribute
 
-            if (context != null)
+            if (rateLimitAttrData != null && rateLimitAttrData.FixedWindowLimitAttribute != null)
             {
-                bool exists = _requestRateLimitRule.TryGetValue(target, out FixedWindowRule storeRule);
-                if (exists)
-                {
-                    currentRule = storeRule;
-                }
-                else
-                {
-                    //check Attribute
-                    var endpoint = CommonUtils.GetEndpoint(context);
-                    if (endpoint != null)
-                    {
-                        var actionAttribute = endpoint.Metadata.GetMetadata<FixedWindowLimitAttribute>();
-                        if (actionAttribute != null)
-                        {
-                            currentRule.LimitNumber = actionAttribute.LimitNumber ;
-                            currentRule.StatWindow = CommonUtils.Parse(actionAttribute.Period);
-                            currentRule.RateLimitExceptionThrow = actionAttribute.RateLimitExceptionThrow;
-                            _requestRateLimitRule.TryAdd(target, currentRule);
-                        }
-                    }
-                }
+                currentRule.LimitNumber = rateLimitAttrData.FixedWindowLimitAttribute.LimitNumber;
+                currentRule.StatWindow = CommonUtils.Parse(rateLimitAttrData.FixedWindowLimitAttribute.Period);
+                currentRule.RateLimitExceptionThrow = rateLimitAttrData.FixedWindowLimitAttribute.RateLimitExceptionThrow;
             }
 
             #endregion local attribute
+
             var result = InnerCheckSingleRule(target, amount, currentRule);
             return new RuleCheckResult()
             {
                 IsLimit = result.Item1,
                 Target = target,
                 Count = result.Item2,
-                Rule = rule
+                Rule = rule,
+                RateLimitExceptionThrow = currentRule.RateLimitExceptionThrow
             };
         }
 
@@ -84,9 +67,9 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
+        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
-            return await Task.FromResult(CheckSingleRule(target, rule,context));
+            return await Task.FromResult(CheckSingleRule(target, rule, rateLimitAttrData));
         }
 
         private Tuple<bool, long> InnerCheckSingleRule(string target, int amount, FixedWindowRule currentRule)

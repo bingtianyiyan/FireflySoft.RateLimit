@@ -14,14 +14,14 @@ namespace FireflySoft.RateLimit.Core
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
-        AlgorithmCheckResult Check(object request);
+        AlgorithmCheckResult Check(object request, RateLimitTypeAttributeJson rateLimitAttrData = null);
 
         /// <summary>
         /// Check the request and return the rate limit result
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
-        Task<AlgorithmCheckResult> CheckAsync(object request);
+        Task<AlgorithmCheckResult> CheckAsync(object request, RateLimitTypeAttributeJson rateLimitAttrData = null);
 
         /// <summary>
         /// Update the rate limit rules

@@ -1,4 +1,5 @@
 using FireflySoft.RateLimit.Core;
+using FireflySoft.RateLimit.Core.Enum;
 using FireflySoft.RateLimit.Core.InProcessAlgorithm;
 using FireflySoft.RateLimit.Core.Rule;
 using Microsoft.AspNetCore.Builder;
@@ -96,7 +97,7 @@ namespace FireflySoft.RateLimit.AspNetCore.Sample
                         return "{\"data\":null,\"resultCode\":0,\"resultMsg\":\"Î´Öª´íÎó\"}";
                     }
                 }
-                , specialRule: new RateLimitSpecialRule() { EnablePolly = true, MethodList = new string[] { "WeatherForecast/Get2"} }
+                , specialRule: new RateLimitSpecialRule() { EnablePolly = true, MethodList = new string[] { "WeatherForecast/Get2" } }
             );
         }
 
@@ -180,6 +181,7 @@ namespace FireflySoft.RateLimit.AspNetCore.Sample
                             return true;
                         },
                         Name="default limit rule",
+                        RateLimitType = RateLimitTypeEnum.SlidingWindow,
                         LimitNumber=30,
                         StatWindow=TimeSpan.FromSeconds(1)
                     }

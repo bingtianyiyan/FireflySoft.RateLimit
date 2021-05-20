@@ -1,9 +1,6 @@
-using FireflySoft.RateLimit.Core.Attribute;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
-using Microsoft.AspNetCore.Http;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -15,11 +12,6 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
     /// </summary>
     public class InProcessSlidingWindowAlgorithm : BaseInProcessAlgorithm
     {
-        /// <summary>
-        /// store rateLimitRule
-        /// </summary>
-        private static readonly ConcurrentDictionary<string, SlidingWindowRule> _requestRateLimitRule = new ConcurrentDictionary<string, SlidingWindowRule>();
-
         /// <summary>
         /// create a new instance
         /// </summary>
@@ -37,47 +29,31 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null)
+        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
             var currentRule = rule as SlidingWindowRule;
             var amount = 1;
+
             #region local attribute
 
-            if (context != null)
+            if (rateLimitAttrData != null && rateLimitAttrData.SlidingWindowLimitAttribute != null)
             {
-                bool exists = _requestRateLimitRule.TryGetValue(target, out SlidingWindowRule storeRule);
-                if (exists)
-                {
-                    currentRule = storeRule;
-                }
-                else
-                {
-                    //check Attribute
-                    var endpoint = CommonUtils.GetEndpoint(context);
-                    if (endpoint != null)
-                    {
-                        var actionAttribute = endpoint.Metadata.GetMetadata<SlidingWindowLimitAttribute>();
-                        if (actionAttribute != null)
-                        {
-                            currentRule.LimitNumber = actionAttribute.LimitNumber;
-                            currentRule.StatWindow = CommonUtils.Parse(actionAttribute.StatWindowPeriod);
-                            currentRule.StatPeriod = CommonUtils.Parse(actionAttribute.StatSmallPeriod);
-                            currentRule.PeriodNumber = (int)(currentRule.StatWindow.TotalMilliseconds / currentRule.StatPeriod.TotalMilliseconds);
-                            currentRule.RateLimitExceptionThrow = actionAttribute.RateLimitExceptionThrow;
-                            _requestRateLimitRule.TryAdd(target, currentRule);
-                        }
-                    }
-                }
+                currentRule.LimitNumber = rateLimitAttrData.SlidingWindowLimitAttribute.LimitNumber;
+                currentRule.StatWindow = CommonUtils.Parse(rateLimitAttrData.SlidingWindowLimitAttribute.StatWindowPeriod);
+                currentRule.StatPeriod = CommonUtils.Parse(rateLimitAttrData.SlidingWindowLimitAttribute.StatSmallPeriod);
+                currentRule.PeriodNumber = (int)(currentRule.StatWindow.TotalMilliseconds / currentRule.StatPeriod.TotalMilliseconds);
             }
 
             #endregion local attribute
+
             var result = InnerCheckSingleRule(target, amount, currentRule);
             return new RuleCheckResult()
             {
                 IsLimit = result.Item1,
                 Target = target,
                 Count = result.Item2,
-                Rule = rule
+                Rule = rule,
+                RateLimitExceptionThrow = currentRule.RateLimitExceptionThrow
             };
         }
 
@@ -87,9 +63,9 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
+        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
-            return await Task.FromResult(CheckSingleRule(target, rule, context));
+            return await Task.FromResult(CheckSingleRule(target, rule, rateLimitAttrData));
         }
 
         private Tuple<bool, long> InnerCheckSingleRule(string target, int amount, SlidingWindowRule currentRule)

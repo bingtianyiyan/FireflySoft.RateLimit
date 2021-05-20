@@ -59,7 +59,7 @@ namespace FireflySoft.RateLimit.Core.Sample
                     Parameters = new Dictionary<string, string>() {
                                 { "from","sample" },
                         }
-                });
+                },null);
 
                 var isLimit = result.IsLimit;
                 Console.WriteLine($"IsLimit:{isLimit}");
@@ -159,7 +159,7 @@ namespace FireflySoft.RateLimit.Core.Sample
                     Parameters = new Dictionary<string, string>() {
                                 { "from","sample" },
                         }
-                });
+                },null);
 
                 var resultValue = await result;
                 foreach (var r in resultValue.RuleCheckResults)
@@ -290,7 +290,7 @@ namespace FireflySoft.RateLimit.Core.Sample
                     Parameters = new Dictionary<string, string>() {
                                 { "from","sample" },
                         }
-                });
+                },null);
 
                 // Wait in the return value is very useful, you can use it in the delay queue, 
                 // you can also make the current thread pause for a specified period of time.

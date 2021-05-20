@@ -1,22 +1,20 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
-using Microsoft.AspNetCore.Http;
 using StackExchange.Redis;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace FireflySoft.RateLimit.Core.RedisAlgorithm
 {
     /// <summary>
-    /// 
+    ///
     /// </summary>
     public class RedisSlidingWindowAlgorithm : BaseRedisAlgorithm
     {
         private readonly RedisLuaScript _slidingWindowIncrementLuaScript;
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="rules"></param>
         /// <param name="redisClient"></param>
@@ -91,7 +89,7 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
 
                 ret[2]=amount+periods_amount
                 if (limit_number>=0 and ret[2]>limit_number) then
-                    if lock_seconds>0 then 
+                    if lock_seconds>0 then
                         redis.call('set',lock_key,'1','EX',lock_seconds,'NX')
                     end
                     ret[1]=1
@@ -115,10 +113,22 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null)
+        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
             var currentRule = rule as SlidingWindowRule;
             var amount = 1;
+
+            #region local attribute
+
+            if (rateLimitAttrData != null && rateLimitAttrData.SlidingWindowLimitAttribute != null)
+            {
+                currentRule.LimitNumber = rateLimitAttrData.SlidingWindowLimitAttribute.LimitNumber;
+                currentRule.StatWindow = CommonUtils.Parse(rateLimitAttrData.SlidingWindowLimitAttribute.StatWindowPeriod);
+                currentRule.StatPeriod = CommonUtils.Parse(rateLimitAttrData.SlidingWindowLimitAttribute.StatSmallPeriod);
+                currentRule.PeriodNumber = (int)(currentRule.StatWindow.TotalMilliseconds / currentRule.StatPeriod.TotalMilliseconds);
+            }
+
+            #endregion local attribute
 
             var currentTime = _timeProvider.GetCurrentUtcMilliseconds();
             var startTime = AlgorithmStartTime.ToSpecifiedTypeTime(currentTime, currentRule.StatWindow, currentRule.StartTimeType);
@@ -133,20 +143,33 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
                 IsLimit = ret[0] == 0 ? false : true,
                 Target = target,
                 Count = ret[1],
-                Rule = rule
+                Rule = rule,
+                RateLimitExceptionThrow = currentRule.RateLimitExceptionThrow
             };
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
+        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
             var currentRule = rule as SlidingWindowRule;
             var amount = 1;
+
+            #region local attribute
+
+            if (rateLimitAttrData != null && rateLimitAttrData.SlidingWindowLimitAttribute != null)
+            {
+                currentRule.LimitNumber = rateLimitAttrData.SlidingWindowLimitAttribute.LimitNumber;
+                currentRule.StatWindow = CommonUtils.Parse(rateLimitAttrData.SlidingWindowLimitAttribute.StatWindowPeriod);
+                currentRule.StatPeriod = CommonUtils.Parse(rateLimitAttrData.SlidingWindowLimitAttribute.StatSmallPeriod);
+                currentRule.PeriodNumber = (int)(currentRule.StatWindow.TotalMilliseconds / currentRule.StatPeriod.TotalMilliseconds);
+            }
+
+            #endregion local attribute
 
             var currentTime = await _timeProvider.GetCurrentUtcMillisecondsAsync();
             var startTime = AlgorithmStartTime.ToSpecifiedTypeTime(currentTime, currentRule.StatWindow, currentRule.StartTimeType);
@@ -161,7 +184,8 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
                 IsLimit = ret[0] == 0 ? false : true,
                 Target = target,
                 Count = ret[1],
-                Rule = rule
+                Rule = rule,
+                RateLimitExceptionThrow = currentRule.RateLimitExceptionThrow
             };
         }
     }

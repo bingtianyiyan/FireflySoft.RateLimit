@@ -1,12 +1,10 @@
+using FireflySoft.RateLimit.Core.Rule;
+using FireflySoft.RateLimit.Core.Time;
+using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
-using FireflySoft.RateLimit.Core.Rule;
-using FireflySoft.RateLimit.Core.Time;
-using Microsoft.AspNetCore.Http;
-using Nito.AsyncEx;
 
 namespace FireflySoft.RateLimit.Core
 {
@@ -57,18 +55,18 @@ namespace FireflySoft.RateLimit.Core
         /// </summary>
         /// <param name="target"></param>
         /// <param name="rule"></param>
-        /// <param name="context">request</param>
+        /// <param name="rateLimitAttrData"></param>
         /// <returns></returns>
-        protected abstract RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null);
+        protected abstract RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData);
 
         /// <summary>
         /// Check single rule for target
         /// </summary>
         /// <param name="target"></param>
         /// <param name="rule"></param>
-        /// <param name="context">request</param>
+        /// <param name="rateLimitAttrData"></param>
         /// <returns></returns>
-        protected abstract Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null);
+        protected abstract Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData);
 
         /// <summary>
         /// Update the current rules
@@ -111,13 +109,13 @@ namespace FireflySoft.RateLimit.Core
         /// </summary>
         /// <param name="request">a request</param>
         /// <returns>the stream of check result</returns>
-        public AlgorithmCheckResult Check(object request)
+        public AlgorithmCheckResult Check(object request, RateLimitTypeAttributeJson rateLimitAttrData)
         {
             if (_updatable)
             {
                 using (var l = _mutex.ReaderLock())
                 {
-                    var originalRuleChecks = CheckAllRules(request);
+                    var originalRuleChecks = CheckAllRules(request, rateLimitAttrData);
                     var ruleCheckResults = new List<RuleCheckResult>();
                     foreach (var result in originalRuleChecks)
                     {
@@ -129,7 +127,7 @@ namespace FireflySoft.RateLimit.Core
             }
             else
             {
-                var originalRuleChecks = CheckAllRules(request);
+                var originalRuleChecks = CheckAllRules(request, rateLimitAttrData);
                 var ruleCheckResults = new List<RuleCheckResult>();
                 foreach (var result in originalRuleChecks)
                 {
@@ -145,13 +143,13 @@ namespace FireflySoft.RateLimit.Core
         /// </summary>
         /// <param name="request">a request</param>
         /// <returns>the stream of check result</returns>
-        public async Task<AlgorithmCheckResult> CheckAsync(object request)
+        public async Task<AlgorithmCheckResult> CheckAsync(object request, RateLimitTypeAttributeJson rateLimitAttrData)
         {
             if (_updatable)
             {
                 using (var l = await _mutex.ReaderLockAsync())
                 {
-                    var originalRuleChecks = CheckAllRulesAsync(request);
+                    var originalRuleChecks = CheckAllRulesAsync(request, rateLimitAttrData);
                     var ruleCheckResults = new List<RuleCheckResult>();
                     await foreach (var result in originalRuleChecks)
                     {
@@ -163,7 +161,7 @@ namespace FireflySoft.RateLimit.Core
             }
             else
             {
-                var originalRuleChecks = CheckAllRulesAsync(request);
+                var originalRuleChecks = CheckAllRulesAsync(request, rateLimitAttrData);
                 var ruleCheckResults = new List<RuleCheckResult>();
                 await foreach (var result in originalRuleChecks)
                 {
@@ -174,7 +172,7 @@ namespace FireflySoft.RateLimit.Core
             }
         }
 
-        private IEnumerable<RuleCheckResult> CheckAllRules(object request)
+        private IEnumerable<RuleCheckResult> CheckAllRules(object request, RateLimitTypeAttributeJson rateLimitAttrData)
         {
             // the control of traversal rules is given to the external access program
             foreach (var rule in _rules)
@@ -188,12 +186,12 @@ namespace FireflySoft.RateLimit.Core
                     }
 
                     target = string.Concat(rule.Id, "-", target);
-                    yield return CheckSingleRule(target, rule);
+                    yield return CheckSingleRule(target, rule, rateLimitAttrData);
                 }
             }
         }
 
-        private async IAsyncEnumerable<RuleCheckResult> CheckAllRulesAsync(object request)
+        private async IAsyncEnumerable<RuleCheckResult> CheckAllRulesAsync(object request, RateLimitTypeAttributeJson rateLimitAttrData)
         {
             // the control of traversal rules is given to the external access program
             foreach (var rule in _rules)
@@ -226,8 +224,7 @@ namespace FireflySoft.RateLimit.Core
                     }
 
                     target = string.Concat(rule.Id, "-", target);
-                    HttpContext context = request is HttpContext ? (HttpContext)request : null;
-                    yield return await CheckSingleRuleAsync(target, rule,context);
+                    yield return await CheckSingleRuleAsync(target, rule, rateLimitAttrData);
                 }
             }
         }

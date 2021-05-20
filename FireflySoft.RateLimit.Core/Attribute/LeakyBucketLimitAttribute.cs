@@ -28,12 +28,12 @@ namespace FireflySoft.RateLimit.Core.Attribute
         /// <summary>
         /// The capacity of current leaky bucket
         /// </summary>
-        public long Capacity { get; private set; }
+        public long Capacity { get; set; }
 
         /// <summary>
         /// The outflow quantity per unit time
         /// </summary>
-        public long OutflowQuantityPerUnit { get; private set; }
+        public long OutflowQuantityPerUnit { get;set; }
 
         /// <summary>
         /// The time unit of outflow from the leaky bucket

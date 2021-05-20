@@ -1,11 +1,7 @@
-using FireflySoft.RateLimit.Core.Attribute;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Features;
 using StackExchange.Redis;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -17,11 +13,6 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
     public class RedisTokenBucketAlgorithm : BaseRedisAlgorithm
     {
         private readonly RedisLuaScript _tokenBucketDecrementLuaScript;
-
-        /// <summary>
-        /// store rateLimitRule
-        /// </summary>
-        private static readonly ConcurrentDictionary<string, TokenBucketRule> _requestRateLimitRule = new ConcurrentDictionary<string, TokenBucketRule>();
 
         /// <summary>
         /// create a new instance
@@ -108,35 +99,17 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
         /// <param name="rule"></param>
         /// <param name="context"></param>
         /// <returns></returns>
-        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null)
+        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
             var currentRule = rule as TokenBucketRule;
             var amount = 1;
             //check controller of method mark TokenbucketAttribute is priority compare with global service.AddRamitLimit
-            if (context != null)
+            if (rateLimitAttrData != null && rateLimitAttrData.TokenBucketLimitAttribute != null)
             {
-                bool exists = _requestRateLimitRule.TryGetValue(target, out TokenBucketRule storeRule);
-                if (exists)
-                {
-                    currentRule = storeRule;
-                }
-                else
-                {
-                    //check Attribute
-                    var endpoint = CommonUtils.GetEndpoint(context);
-                    if (endpoint != null)
-                    {
-                        var actionAttribute = endpoint.Metadata.GetMetadata<TokenBucketLimitAttribute>();
-                        if (actionAttribute != null)
-                        {
-                            currentRule.Capacity = actionAttribute.Capacity;
-                            currentRule.InflowQuantityPerUnit = actionAttribute.InflowQuantityPerUnit;
-                            currentRule.InflowUnit = CommonUtils.Parse(actionAttribute.Period);
-                            currentRule.RateLimitExceptionThrow = actionAttribute.RateLimitExceptionThrow;
-                            _requestRateLimitRule.TryAdd(target, currentRule);
-                        }
-                    }
-                }
+                currentRule.Capacity = rateLimitAttrData.TokenBucketLimitAttribute.Capacity;
+                currentRule.InflowQuantityPerUnit = rateLimitAttrData.TokenBucketLimitAttribute.InflowQuantityPerUnit;
+                currentRule.InflowUnit = CommonUtils.Parse(rateLimitAttrData.TokenBucketLimitAttribute.Period);
+                currentRule.RateLimitExceptionThrow = rateLimitAttrData.TokenBucketLimitAttribute.RateLimitExceptionThrow;
             }
             var inflowUnit = currentRule.InflowUnit.TotalMilliseconds;
             var currentTime = _timeProvider.GetCurrentUtcMilliseconds();
@@ -145,16 +118,13 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
             var ret = (long[])EvaluateScript(_tokenBucketDecrementLuaScript, new RedisKey[] { target },
                 new RedisValue[] { amount, currentRule.Capacity, inflowUnit, currentRule.InflowQuantityPerUnit, currentTime, startTime, currentRule.LockSeconds });
             var result = new Tuple<bool, long>(ret[0] == 0 ? false : true, ret[1]);
-            if (result.Item1 && currentRule.RateLimitExceptionThrow)
-            {
-                throw new RateLimitException(context.Request.Path.Value);
-            }
             return new RuleCheckResult()
             {
                 IsLimit = result.Item1,
                 Target = target,
                 Count = result.Item2,
-                Rule = rule
+                Rule = rule,
+                RateLimitExceptionThrow = currentRule.RateLimitExceptionThrow
             };
         }
 
@@ -165,35 +135,17 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
         /// <param name="rule"></param>
         /// <param name="context"></param>
         /// <returns></returns>
-        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
+        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
             var currentRule = rule as TokenBucketRule;
             var amount = 1;
             //check controller of method mark TokenbucketAttribute is priority compare with global service.AddRamitLimit
-            if (context != null)
+            if (rateLimitAttrData != null && rateLimitAttrData.TokenBucketLimitAttribute != null)
             {
-                bool exists = _requestRateLimitRule.TryGetValue(target, out TokenBucketRule storeRule);
-                if (exists)
-                {
-                    currentRule = storeRule;
-                }
-                else
-                {
-                    //check Attribute
-                    var endpoint = CommonUtils.GetEndpoint(context);
-                    if (endpoint != null)
-                    {
-                        var actionAttribute = endpoint.Metadata.GetMetadata<TokenBucketLimitAttribute>();
-                        if (actionAttribute != null)
-                        {
-                            currentRule.Capacity = actionAttribute.Capacity;
-                            currentRule.InflowQuantityPerUnit = actionAttribute.InflowQuantityPerUnit;
-                            currentRule.InflowUnit = CommonUtils.Parse(actionAttribute.Period);
-                            currentRule.RateLimitExceptionThrow = actionAttribute.RateLimitExceptionThrow;
-                            _requestRateLimitRule.TryAdd(target, currentRule);
-                        }
-                    }
-                }
+                currentRule.Capacity = rateLimitAttrData.TokenBucketLimitAttribute.Capacity;
+                currentRule.InflowQuantityPerUnit = rateLimitAttrData.TokenBucketLimitAttribute.InflowQuantityPerUnit;
+                currentRule.InflowUnit = CommonUtils.Parse(rateLimitAttrData.TokenBucketLimitAttribute.Period);
+                currentRule.RateLimitExceptionThrow = rateLimitAttrData.TokenBucketLimitAttribute.RateLimitExceptionThrow;
             }
             var inflowUnit = currentRule.InflowUnit.TotalMilliseconds;
             var currentTime = await _timeProvider.GetCurrentUtcMillisecondsAsync();
@@ -202,16 +154,13 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
             var ret = (long[])await EvaluateScriptAsync(_tokenBucketDecrementLuaScript, new RedisKey[] { target },
                 new RedisValue[] { amount, currentRule.Capacity, inflowUnit, currentRule.InflowQuantityPerUnit, currentTime, startTime, currentRule.LockSeconds });
             var result = new Tuple<bool, long>(ret[0] == 0 ? false : true, ret[1]);
-            if (result.Item1 && currentRule.RateLimitExceptionThrow)
-            {
-                throw new RateLimitException(context.Request.Path.Value);
-            }
             return new RuleCheckResult()
             {
                 IsLimit = result.Item1,
                 Target = target,
                 Count = result.Item2,
-                Rule = rule
+                Rule = rule,
+                RateLimitExceptionThrow = currentRule.RateLimitExceptionThrow
             };
         }
     }

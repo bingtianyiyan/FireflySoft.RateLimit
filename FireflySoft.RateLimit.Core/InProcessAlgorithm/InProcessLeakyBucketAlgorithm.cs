@@ -1,9 +1,6 @@
-using FireflySoft.RateLimit.Core.Attribute;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
-using Microsoft.AspNetCore.Http;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -14,11 +11,6 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
     /// </summary>
     public class InProcessLeakyBucketAlgorithm : BaseInProcessAlgorithm
     {
-        /// <summary>
-        /// store rateLimitRule
-        /// </summary>
-        private static readonly ConcurrentDictionary<string, LeakyBucketRule> _requestRateLimitRule = new ConcurrentDictionary<string, LeakyBucketRule>();
-
         /// <summary>
         /// create a new instance
         /// </summary>
@@ -36,37 +28,19 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null)
+        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
             var currentRule = rule as LeakyBucketRule;
             var amount = 1;
 
             #region local attribute
 
-            if (context != null)
+            if (rateLimitAttrData != null && rateLimitAttrData.LeakyBucketLimitAttribute != null)
             {
-                bool exists = _requestRateLimitRule.TryGetValue(target, out LeakyBucketRule storeRule);
-                if (exists)
-                {
-                    currentRule = storeRule;
-                }
-                else
-                {
-                    //check Attribute
-                    var endpoint = CommonUtils.GetEndpoint(context);
-                    if (endpoint != null)
-                    {
-                        var actionAttribute = endpoint.Metadata.GetMetadata<LeakyBucketLimitAttribute>();
-                        if (actionAttribute != null)
-                        {
-                            currentRule.Capacity = actionAttribute.Capacity;
-                            currentRule.OutflowQuantityPerUnit = actionAttribute.OutflowQuantityPerUnit;
-                            currentRule.OutflowUnit = CommonUtils.Parse(actionAttribute.Period);
-                            currentRule.RateLimitExceptionThrow = actionAttribute.RateLimitExceptionThrow;
-                            _requestRateLimitRule.TryAdd(target, currentRule);
-                        }
-                    }
-                }
+                currentRule.Capacity = rateLimitAttrData.LeakyBucketLimitAttribute.Capacity;
+                currentRule.OutflowQuantityPerUnit = rateLimitAttrData.LeakyBucketLimitAttribute.OutflowQuantityPerUnit;
+                currentRule.OutflowUnit = CommonUtils.Parse(rateLimitAttrData.LeakyBucketLimitAttribute.Period);
+                currentRule.RateLimitExceptionThrow = rateLimitAttrData.LeakyBucketLimitAttribute.RateLimitExceptionThrow;
             }
 
             #endregion local attribute
@@ -78,7 +52,8 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
                 Target = target,
                 Count = result.Item2,
                 Rule = rule,
-                Wait = result.Item3
+                Wait = result.Item3,
+                RateLimitExceptionThrow = currentRule.RateLimitExceptionThrow
             };
         }
 
@@ -89,9 +64,9 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         /// <param name="rule"></param>
         /// <param name="context"></param>
         /// <returns></returns>
-        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
+        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
-            return await Task.FromResult(CheckSingleRule(target, rule, context));
+            return await Task.FromResult(CheckSingleRule(target, rule, rateLimitAttrData));
         }
 
         /// <summary>

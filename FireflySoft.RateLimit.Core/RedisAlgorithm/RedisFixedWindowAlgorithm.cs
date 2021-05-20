@@ -1,10 +1,9 @@
+using FireflySoft.RateLimit.Core.Rule;
+using FireflySoft.RateLimit.Core.Time;
+using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using FireflySoft.RateLimit.Core.Rule;
-using FireflySoft.RateLimit.Core.Time;
-using Microsoft.AspNetCore.Http;
-using StackExchange.Redis;
 
 namespace FireflySoft.RateLimit.Core.RedisAlgorithm
 {
@@ -68,10 +67,21 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null)
+        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
             var currentRule = rule as FixedWindowRule;
             var amount = 1;
+
+            #region local attribute
+
+            if (rateLimitAttrData != null && rateLimitAttrData.FixedWindowLimitAttribute != null)
+            {
+                currentRule.LimitNumber = rateLimitAttrData.FixedWindowLimitAttribute.LimitNumber;
+                currentRule.StatWindow = CommonUtils.Parse(rateLimitAttrData.FixedWindowLimitAttribute.Period);
+                currentRule.RateLimitExceptionThrow = rateLimitAttrData.FixedWindowLimitAttribute.RateLimitExceptionThrow;
+            }
+
+            #endregion local attribute
 
             long expireTime = (long)currentRule.StatWindow.TotalMilliseconds;
             if (currentRule.StartTimeType == StartTimeType.FromNaturalPeriodBeign)
@@ -83,13 +93,13 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
             var ret = (long[])EvaluateScript(_fixedWindowIncrementLuaScript,
                 new RedisKey[] { target },
                 new RedisValue[] { amount, expireTime, currentRule.LimitNumber, currentRule.LockSeconds });
-
             return new RuleCheckResult()
             {
                 IsLimit = ret[0] == 0 ? false : true,
                 Target = target,
                 Count = ret[1],
-                Rule = rule
+                Rule = rule,
+                RateLimitExceptionThrow = currentRule.RateLimitExceptionThrow
             };
         }
 
@@ -99,10 +109,21 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
+        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
             var currentRule = rule as FixedWindowRule;
             var amount = 1;
+
+            #region local attribute
+
+            if (rateLimitAttrData != null && rateLimitAttrData.FixedWindowLimitAttribute != null)
+            {
+                currentRule.LimitNumber = rateLimitAttrData.FixedWindowLimitAttribute.LimitNumber;
+                currentRule.StatWindow = CommonUtils.Parse(rateLimitAttrData.FixedWindowLimitAttribute.Period);
+                currentRule.RateLimitExceptionThrow = rateLimitAttrData.FixedWindowLimitAttribute.RateLimitExceptionThrow;
+            }
+
+            #endregion local attribute
 
             long expireTime = (long)currentRule.StatWindow.TotalMilliseconds;
             if (currentRule.StartTimeType == StartTimeType.FromNaturalPeriodBeign)
@@ -114,13 +135,13 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
             var ret = (long[])await EvaluateScriptAsync(_fixedWindowIncrementLuaScript,
                 new RedisKey[] { target },
                 new RedisValue[] { amount, expireTime, currentRule.LimitNumber, currentRule.LockSeconds }).ConfigureAwait(false);
-
             return new RuleCheckResult()
             {
                 IsLimit = ret[0] == 0 ? false : true,
                 Target = target,
                 Count = ret[1],
-                Rule = rule
+                Rule = rule,
+                RateLimitExceptionThrow = currentRule.RateLimitExceptionThrow
             };
         }
 

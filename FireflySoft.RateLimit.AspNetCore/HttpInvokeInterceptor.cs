@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using FireflySoft.RateLimit.Core;
 using Microsoft.AspNetCore.Http;
 
-namespace FireflySoft.RateLimit.AspNetCore
+namespace FireflySoft.RateLimit.Core
 {
     /// <summary>
     /// Http Invoke Interceptor

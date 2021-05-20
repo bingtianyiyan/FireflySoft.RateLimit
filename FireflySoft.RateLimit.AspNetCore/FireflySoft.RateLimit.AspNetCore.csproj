@@ -18,6 +18,11 @@
     <IsPackable>true</IsPackable>
     <AssemblyVersion>2.0.0</AssemblyVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.2.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Routing" Version="2.2.2" />
+  </ItemGroup>
   
   <ItemGroup>
     <ProjectReference Include="..\FireflySoft.RateLimit.Core\FireflySoft.RateLimit.Core.csproj">

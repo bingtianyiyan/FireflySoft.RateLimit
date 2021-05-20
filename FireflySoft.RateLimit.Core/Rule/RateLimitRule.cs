@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FireflySoft.RateLimit.Core.Enum;
+using System;
 using System.Threading.Tasks;
 
 namespace FireflySoft.RateLimit.Core.Rule
@@ -18,6 +19,11 @@ namespace FireflySoft.RateLimit.Core.Rule
         /// The name of the rule.
         /// </summary>
         public string Name { get; set; }
+
+        /// <summary>
+        /// RateLimit Type
+        /// </summary>
+        public RateLimitTypeEnum RateLimitType { get; set; }
 
         /// <summary>
         /// The number of seconds locked after triggering rate limiting. 0 means not locked

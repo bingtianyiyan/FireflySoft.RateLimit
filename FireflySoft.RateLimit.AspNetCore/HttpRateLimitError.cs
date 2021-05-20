@@ -1,6 +1,6 @@
 using System;
 
-namespace FireflySoft.RateLimit.AspNetCore
+namespace FireflySoft.RateLimit.Core
 {
     /// <summary>
     /// Http Rate Limit Error

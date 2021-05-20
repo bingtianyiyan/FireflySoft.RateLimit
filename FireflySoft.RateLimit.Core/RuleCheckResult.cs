@@ -38,5 +38,11 @@ namespace FireflySoft.RateLimit.Core
         /// </summary>
         /// <value></value>
         public RateLimitRule Rule { get; set; }
+
+        /// <summary>
+        /// true: throw exception, false:not throw exception
+        /// Exception->RateLimitException
+        /// </summary>
+        public bool RateLimitExceptionThrow { get; set; }
     }
 }

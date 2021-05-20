@@ -1,10 +1,9 @@
+using FireflySoft.RateLimit.Core.Rule;
+using FireflySoft.RateLimit.Core.Time;
+using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using FireflySoft.RateLimit.Core.Rule;
-using FireflySoft.RateLimit.Core.Time;
-using Microsoft.AspNetCore.Http;
-using StackExchange.Redis;
 
 namespace FireflySoft.RateLimit.Core.RedisAlgorithm
 {
@@ -137,10 +136,22 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, HttpContext context = null)
+        protected override RuleCheckResult CheckSingleRule(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
             var currentRule = rule as LeakyBucketRule;
             var amount = 1;
+
+            #region local attribute
+
+            if (rateLimitAttrData != null && rateLimitAttrData.LeakyBucketLimitAttribute != null)
+            {
+                currentRule.Capacity = rateLimitAttrData.LeakyBucketLimitAttribute.Capacity;
+                currentRule.OutflowQuantityPerUnit = rateLimitAttrData.LeakyBucketLimitAttribute.OutflowQuantityPerUnit;
+                currentRule.OutflowUnit = CommonUtils.Parse(rateLimitAttrData.LeakyBucketLimitAttribute.Period);
+                currentRule.RateLimitExceptionThrow = rateLimitAttrData.LeakyBucketLimitAttribute.RateLimitExceptionThrow;
+            }
+
+            #endregion local attribute
 
             var outflowUnit = currentRule.OutflowUnit.TotalMilliseconds;
             var currentTime = _timeProvider.GetCurrentUtcMilliseconds();
@@ -155,6 +166,7 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
                 Count = ret[1],
                 Rule = rule,
                 Wait = ret[2],
+                RateLimitExceptionThrow = currentRule.RateLimitExceptionThrow
             };
         }
 
@@ -164,10 +176,22 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
         /// <param name="target"></param>
         /// <param name="rule"></param>
         /// <returns></returns>
-        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
+        protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, RateLimitTypeAttributeJson rateLimitAttrData = null)
         {
             var currentRule = rule as LeakyBucketRule;
             var amount = 1;
+
+            #region local attribute
+
+            if (rateLimitAttrData != null && rateLimitAttrData.LeakyBucketLimitAttribute != null)
+            {
+                currentRule.Capacity = rateLimitAttrData.LeakyBucketLimitAttribute.Capacity;
+                currentRule.OutflowQuantityPerUnit = rateLimitAttrData.LeakyBucketLimitAttribute.OutflowQuantityPerUnit;
+                currentRule.OutflowUnit = CommonUtils.Parse(rateLimitAttrData.LeakyBucketLimitAttribute.Period);
+                currentRule.RateLimitExceptionThrow = rateLimitAttrData.LeakyBucketLimitAttribute.RateLimitExceptionThrow;
+            }
+
+            #endregion local attribute
 
             // can not call redis TIME command in script
             var outflowUnit = currentRule.OutflowUnit.TotalMilliseconds;
@@ -183,6 +207,7 @@ namespace FireflySoft.RateLimit.Core.RedisAlgorithm
                 Count = ret[1],
                 Rule = rule,
                 Wait = ret[2],
+                RateLimitExceptionThrow = currentRule.RateLimitExceptionThrow
             };
         }
     }

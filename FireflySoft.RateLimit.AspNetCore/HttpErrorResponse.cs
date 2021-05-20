@@ -5,7 +5,7 @@ using FireflySoft.RateLimit.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
 
-namespace FireflySoft.RateLimit.AspNetCore
+namespace FireflySoft.RateLimit.Core
 {
     /// <summary>
     /// Defines the http error response for rate limit
