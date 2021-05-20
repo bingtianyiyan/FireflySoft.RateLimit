@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using FireflySoft.RateLimit.Core.Attribute;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
 using Microsoft.AspNetCore.Http;
@@ -12,6 +14,11 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
     /// </summary>
     public class InProcessFixedWindowAlgorithm : BaseInProcessAlgorithm
     {
+        /// <summary>
+        /// store rateLimitRule
+        /// </summary>
+        private static readonly ConcurrentDictionary<string, FixedWindowRule> _requestRateLimitRule = new ConcurrentDictionary<string, FixedWindowRule>();
+
         /// <summary>
         /// create a new instance
         /// </summary>
@@ -33,7 +40,34 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         {
             var currentRule = rule as FixedWindowRule;
             var amount = 1;
+            #region local attribute
 
+            if (context != null)
+            {
+                bool exists = _requestRateLimitRule.TryGetValue(target, out FixedWindowRule storeRule);
+                if (exists)
+                {
+                    currentRule = storeRule;
+                }
+                else
+                {
+                    //check Attribute
+                    var endpoint = CommonUtils.GetEndpoint(context);
+                    if (endpoint != null)
+                    {
+                        var actionAttribute = endpoint.Metadata.GetMetadata<FixedWindowLimitAttribute>();
+                        if (actionAttribute != null)
+                        {
+                            currentRule.LimitNumber = actionAttribute.LimitNumber ;
+                            currentRule.StatWindow = CommonUtils.Parse(actionAttribute.Period);
+                            currentRule.RateLimitExceptionThrow = actionAttribute.RateLimitExceptionThrow;
+                            _requestRateLimitRule.TryAdd(target, currentRule);
+                        }
+                    }
+                }
+            }
+
+            #endregion local attribute
             var result = InnerCheckSingleRule(target, amount, currentRule);
             return new RuleCheckResult()
             {

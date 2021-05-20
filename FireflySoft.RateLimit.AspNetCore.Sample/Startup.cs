@@ -24,7 +24,8 @@ namespace FireflySoft.RateLimit.AspNetCore.Sample
         public void ConfigureServices(IServiceCollection services)
         {
             //AddLimitForPerSecond(services);
-            AddLimitForTokenBucketPerSecond(services);
+            //AddLimitForTokenBucketPerSecond(services);
+            AddLimitFoSildingWindow(services);
 
             services.AddControllers();
         }
@@ -161,6 +162,28 @@ namespace FireflySoft.RateLimit.AspNetCore.Sample
                         Console.WriteLine("Rate Limit Alarm!!!");
                     }
                 }
+            );
+        }
+
+        private void AddLimitFoSildingWindow(IServiceCollection app)
+        {
+            app.AddRateLimit(new InProcessSlidingWindowAlgorithm(
+                new[] {
+                    new SlidingWindowRule(TimeSpan.FromSeconds(60),TimeSpan.FromSeconds(5))
+                    {
+                        ExtractTarget = context =>
+                        {
+                            return (context as HttpContext).Request.Path.Value;
+                        },
+                        CheckRuleMatching = context =>
+                        {
+                            return true;
+                        },
+                        Name="default limit rule",
+                        LimitNumber=30,
+                        StatWindow=TimeSpan.FromSeconds(1)
+                    }
+                })
             );
         }
     }

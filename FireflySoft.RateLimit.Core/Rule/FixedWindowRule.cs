@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace FireflySoft.RateLimit.Core.Rule
 {
@@ -18,5 +17,11 @@ namespace FireflySoft.RateLimit.Core.Rule
         /// The threshold of triggering rate limit in the statistical time window。
         /// </summary>
         public int LimitNumber { get; set; }
+
+        /// <summary>
+        /// true: throw exception, false:not throw exception
+        /// Exception->RateLimitException
+        /// </summary>
+        public bool RateLimitExceptionThrow { get; set; }
     }
 }

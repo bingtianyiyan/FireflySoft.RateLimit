@@ -20,6 +20,7 @@ namespace FireflySoft.RateLimit.Core.Rule
             {
                 return _periodNumber;
             }
+            set { this._periodNumber = value; }
         }
 
         /// <summary>
@@ -35,7 +36,13 @@ namespace FireflySoft.RateLimit.Core.Rule
         /// <summary>
         /// Small period length in statistical time window
         /// </summary>
-        public TimeSpan StatPeriod { get; private set; }
+        public TimeSpan StatPeriod { get; set; }
+
+        /// <summary>
+        /// true: throw exception, false:not throw exception
+        /// Exception->RateLimitException
+        /// </summary>
+        public bool RateLimitExceptionThrow { get; set; }
 
         /// <summary>
         /// create a new instance

@@ -11,17 +11,23 @@ namespace FireflySoft.RateLimit.Core.Rule
         /// <summary>
         /// The capacity of current leaky bucket
         /// </summary>
-        public long Capacity { get; private set; }
+        public long Capacity { get; set; }
 
         /// <summary>
         /// The outflow quantity per unit time
         /// </summary>
-        public long OutflowQuantityPerUnit { get; private set; }
+        public long OutflowQuantityPerUnit { get;set; }
 
         /// <summary>
         /// The time unit of outflow from the leaky bucket
         /// </summary>
-        public TimeSpan OutflowUnit { get; private set; }
+        public TimeSpan OutflowUnit { get; set; }
+
+        /// <summary>
+        /// true: throw exception, false:not throw exception
+        /// Exception->RateLimitException
+        /// </summary>
+        public bool RateLimitExceptionThrow { get; set; }
 
         /// <summary>
         /// create a new instance

@@ -1,7 +1,9 @@
+using FireflySoft.RateLimit.Core.Attribute;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
 using Microsoft.AspNetCore.Http;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -13,6 +15,11 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
     /// </summary>
     public class InProcessSlidingWindowAlgorithm : BaseInProcessAlgorithm
     {
+        /// <summary>
+        /// store rateLimitRule
+        /// </summary>
+        private static readonly ConcurrentDictionary<string, SlidingWindowRule> _requestRateLimitRule = new ConcurrentDictionary<string, SlidingWindowRule>();
+
         /// <summary>
         /// create a new instance
         /// </summary>
@@ -34,7 +41,36 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         {
             var currentRule = rule as SlidingWindowRule;
             var amount = 1;
+            #region local attribute
 
+            if (context != null)
+            {
+                bool exists = _requestRateLimitRule.TryGetValue(target, out SlidingWindowRule storeRule);
+                if (exists)
+                {
+                    currentRule = storeRule;
+                }
+                else
+                {
+                    //check Attribute
+                    var endpoint = CommonUtils.GetEndpoint(context);
+                    if (endpoint != null)
+                    {
+                        var actionAttribute = endpoint.Metadata.GetMetadata<SlidingWindowLimitAttribute>();
+                        if (actionAttribute != null)
+                        {
+                            currentRule.LimitNumber = actionAttribute.LimitNumber;
+                            currentRule.StatWindow = CommonUtils.Parse(actionAttribute.StatWindowPeriod);
+                            currentRule.StatPeriod = CommonUtils.Parse(actionAttribute.StatSmallPeriod);
+                            currentRule.PeriodNumber = (int)(currentRule.StatWindow.TotalMilliseconds / currentRule.StatPeriod.TotalMilliseconds);
+                            currentRule.RateLimitExceptionThrow = actionAttribute.RateLimitExceptionThrow;
+                            _requestRateLimitRule.TryAdd(target, currentRule);
+                        }
+                    }
+                }
+            }
+
+            #endregion local attribute
             var result = InnerCheckSingleRule(target, amount, currentRule);
             return new RuleCheckResult()
             {

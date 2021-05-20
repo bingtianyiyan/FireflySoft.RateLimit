@@ -1,9 +1,11 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+using FireflySoft.RateLimit.Core.Attribute;
 using FireflySoft.RateLimit.Core.Rule;
 using FireflySoft.RateLimit.Core.Time;
 using Microsoft.AspNetCore.Http;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
 {
@@ -12,6 +14,11 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
     /// </summary>
     public class InProcessLeakyBucketAlgorithm : BaseInProcessAlgorithm
     {
+        /// <summary>
+        /// store rateLimitRule
+        /// </summary>
+        private static readonly ConcurrentDictionary<string, LeakyBucketRule> _requestRateLimitRule = new ConcurrentDictionary<string, LeakyBucketRule>();
+
         /// <summary>
         /// create a new instance
         /// </summary>
@@ -34,6 +41,36 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
             var currentRule = rule as LeakyBucketRule;
             var amount = 1;
 
+            #region local attribute
+
+            if (context != null)
+            {
+                bool exists = _requestRateLimitRule.TryGetValue(target, out LeakyBucketRule storeRule);
+                if (exists)
+                {
+                    currentRule = storeRule;
+                }
+                else
+                {
+                    //check Attribute
+                    var endpoint = CommonUtils.GetEndpoint(context);
+                    if (endpoint != null)
+                    {
+                        var actionAttribute = endpoint.Metadata.GetMetadata<LeakyBucketLimitAttribute>();
+                        if (actionAttribute != null)
+                        {
+                            currentRule.Capacity = actionAttribute.Capacity;
+                            currentRule.OutflowQuantityPerUnit = actionAttribute.OutflowQuantityPerUnit;
+                            currentRule.OutflowUnit = CommonUtils.Parse(actionAttribute.Period);
+                            currentRule.RateLimitExceptionThrow = actionAttribute.RateLimitExceptionThrow;
+                            _requestRateLimitRule.TryAdd(target, currentRule);
+                        }
+                    }
+                }
+            }
+
+            #endregion local attribute
+
             var result = InnerCheckSingleRule(target, amount, currentRule);
             return new RuleCheckResult()
             {
@@ -46,14 +83,15 @@ namespace FireflySoft.RateLimit.Core.InProcessAlgorithm
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="target"></param>
         /// <param name="rule"></param>
+        /// <param name="context"></param>
         /// <returns></returns>
         protected override async Task<RuleCheckResult> CheckSingleRuleAsync(string target, RateLimitRule rule, HttpContext context = null)
         {
-            return await Task.FromResult(CheckSingleRule(target, rule,context));
+            return await Task.FromResult(CheckSingleRule(target, rule, context));
         }
 
         /// <summary>
