@@ -59,51 +59,13 @@ namespace FireflySoft.RateLimit.Core
         {
             #region check whether need RateLimit  and local Attribute is prority then other rules
 
-            string methodPath = context.Request.Path.Value;
-            bool getMethodNameResult = _getMethodRoutePath.TryGetValue(methodPath, out string methodCacheName);
-            if (!getMethodNameResult)
+            string methodCacheName = ContextMethodNameHandler(context);
+            var requestNeedRateLimt = await RequestNeedRateLimitAsync(context, methodCacheName);
+            if (!requestNeedRateLimt.Item1)
             {
-                var routeData = context.GetRouteData();
-                if (routeData != null
-                    && routeData.Values.Any())
-                {
-                    var controllerName = routeData.Values["controller"];
-                    var actionName = routeData.Values["action"];
-                    methodCacheName = controllerName != null && actionName != null ? controllerName + "/" + actionName : methodPath;
-                    _getMethodRoutePath.TryAdd(methodPath, methodCacheName);
-                }
+                return;
             }
-            EnableRateLimitAttribute enableRateLimitAttribute = null;
-            bool specialRuleResult = _specialRule != null
-                                    && _specialRule.MethodList != null
-                                    && _specialRule.MethodList.Any()
-                                    && _specialRule.MethodList.Contains(methodCacheName);
-            if (!specialRuleResult)
-            {
-                //wheather need RateLimit
-                var endpoint = GetEndpoint(context);
-                if (endpoint != null)
-                {
-                    enableRateLimitAttribute = endpoint.Metadata.GetMetadata<EnableRateLimitAttribute>();
-                    if (enableRateLimitAttribute == null)
-                    {
-                        await _next(context);
-                        return;
-                    }
-                    var disableRateLimitAttribute = endpoint.Metadata.GetMetadata<DisableRateLimitAttribute>();
-                    if (disableRateLimitAttribute != null)
-                    {
-                        await _next(context);
-                        return;
-                    }
-                }
-                else
-                {
-                    await _next(context);
-                    return;
-                }
-            }
-
+            EnableRateLimitAttribute enableRateLimitAttribute = requestNeedRateLimt.Item2;
             #endregion check whether need RateLimit  and local Attribute is prority then other rules
 
             //local method attribute
@@ -120,9 +82,9 @@ namespace FireflySoft.RateLimit.Core
             {
                 checkResult = await PollyRateLimitAdvancedCircuitBreakerAsync(context.Request.Path.Value, enableRateLimitAttribute)
                     .ExecuteAsync(async () =>
-                {
-                    return await _algorithm.CheckAsync(context, getMethodAttrRateLimitData);
-                });
+                    {
+                        return await _algorithm.CheckAsync(context, getMethodAttrRateLimitData);
+                    });
             }
             else
             {
@@ -135,6 +97,14 @@ namespace FireflySoft.RateLimit.Core
 
             if (checkResult.IsLimit)
             {
+                if(checkResult.RuleCheckResults != null && checkResult.RuleCheckResults.Any())
+                {
+                   var checkException = checkResult.RuleCheckResults.FirstOrDefault(x => x.RateLimitExceptionThrow == true);
+                    if(checkException != null)
+                    {
+                        throw new RateLimitException(methodCacheName);
+                    }
+                }
                 await DoOnTriggered(context, checkResult).ConfigureAwait(false);
 
                 context.Response.StatusCode = _error.HttpStatusCode;
@@ -152,6 +122,72 @@ namespace FireflySoft.RateLimit.Core
 
                 await DoOnAfterUntriggeredDoNext(context, checkResult).ConfigureAwait(false);
             }
+        }
+
+        /// <summary>
+        /// request api method name cache handler
+        /// </summary>
+        /// <param name="context"></param>
+        /// <returns></returns>
+        private static string ContextMethodNameHandler(HttpContext context)
+        {
+            string methodPath = context.Request.Path.Value;
+            bool getMethodNameResult = _getMethodRoutePath.TryGetValue(methodPath, out string methodCacheName);
+            if (!getMethodNameResult)
+            {
+                var routeData = context.GetRouteData();
+                if (routeData != null
+                    && routeData.Values.Any())
+                {
+                    var controllerName = routeData.Values["controller"];
+                    var actionName = routeData.Values["action"];
+                    methodCacheName = controllerName != null && actionName != null ? controllerName + "/" + actionName : methodPath;
+                    _getMethodRoutePath.TryAdd(methodPath, methodCacheName);
+                }
+            }
+
+            return methodCacheName;
+        }
+
+        /// <summary>
+        /// request can open rateLimit
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="methodCacheName"></param>
+        /// <returns></returns>
+        private async Task<(bool, EnableRateLimitAttribute)> RequestNeedRateLimitAsync(HttpContext context,string methodCacheName)
+        {
+            EnableRateLimitAttribute enableRateLimitAttribute = null;
+            bool specialRuleResult = _specialRule != null
+                                    && _specialRule.MethodList != null
+                                    && _specialRule.MethodList.Any()
+                                    && _specialRule.MethodList.Contains(methodCacheName);
+            if (!specialRuleResult)
+            {
+                //wheather need RateLimit
+                var endpoint = GetEndpoint(context);
+                if (endpoint != null)
+                {
+                    enableRateLimitAttribute = endpoint.Metadata.GetMetadata<EnableRateLimitAttribute>();
+                    if (enableRateLimitAttribute == null)
+                    {
+                        await _next(context);
+                        return (false, enableRateLimitAttribute);
+                    }
+                    var disableRateLimitAttribute = endpoint.Metadata.GetMetadata<DisableRateLimitAttribute>();
+                    if (disableRateLimitAttribute != null)
+                    {
+                        await _next(context);
+                        return (false, enableRateLimitAttribute);
+                    }
+                }
+                else
+                {
+                    await _next(context);
+                    return (false, enableRateLimitAttribute);
+                }
+            }
+            return (true, enableRateLimitAttribute);
         }
 
         /// <summary>
